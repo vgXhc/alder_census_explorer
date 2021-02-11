@@ -1,0 +1,98 @@
+---
+title: "Race/ethnicity by ward"
+description: |
+  What are the racial demographics of Madison's aldermanic districts
+author:
+  - name: Harald Kliems 
+    orcid_id: 0000-0003-2542-0047
+    url: https://haraldkliems.netlify.app/
+date: "`r Sys.Date()`"
+repository_url: https://github.com/vgXhc/alder_census_explorer
+compare_updates_url:
+creative_commons: CC BY-SA
+output: 
+  distill::distill_article:
+    self_contained: false
+draft: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r libraries}
+library(tidyverse)
+library(tidycensus)
+options(tigris_use_cache = TRUE)
+library(sf)
+library(tmap)
+library(mapview)
+library(janitor)
+```
+
+```{r message=FALSE, error=FALSE, echo=FALSE, results=FALSE}
+
+download.file("https://opendata.arcgis.com/datasets/81039877861c40a1857b2e7634951e04_10.zip", "data/81039877861c40a1857b2e7634951e04_10.zip")
+unzip("data/81039877861c40a1857b2e7634951e04_10.zip", exdir = "data")
+file.remove("data/81039877861c40a1857b2e7634951e04_10.zip")
+alder <- read_sf("data/Aldermanic_Districts.shp") %>% 
+  st_make_valid() %>% #source polygons contained some invalid geometries
+  clean_names()
+```
+```{r get-census-data}
+race <- get_acs(geography = "block group",
+                    table = "B02001",
+                    state = "WI",
+              county = "025",
+              geometry = T,
+              summary_var = "B02001_001"
+              )
+```
+
+The American Community Survey includes data on race and ethnicity. Madison's aldermanic districts are comprised of census blocks, but for privacy reason, most ACS data is not available down to the block or even block group level. Data on race is available at the block group level, and we can approximate district boundaries based on this. Note that the maps below only display race, not ethnicity. Ethnicity data unfortunately is not available at the block group level. Data are 5-year estimates, covering 2015--19.
+
+```{r}
+race <- race %>% 
+  mutate(pct = estimate/summary_est) %>% 
+  mutate(variable = case_when(variable == "B02001_001" ~ "Total",
+                              variable == "B02001_002" ~ "White",
+                              variable == "B02001_003" ~ "Black/African American",
+                              variable == "B02001_004" ~ "American Indian",
+                              variable == "B02001_005" ~ "Asian",
+                              variable == "B02001_006" ~ "Native Hawaiian/PI",
+                              variable == "B02001_007" ~ "Some other race alone",
+                              variable == "B02001_008" ~ "2+ races",
+                              T ~ variable))
+
+```
+
+
+```{r}
+race <- race %>% 
+  st_transform(st_crs(alder)) %>% 
+  st_join(alder, st_intersects) %>% 
+  filter(!is.na(ald_dist)) %>% 
+  st_drop_geometry() %>% 
+  group_by(ald_dist, variable) %>% 
+  summarize(estimate = sum(estimate), total = sum(summary_est)) %>% 
+  mutate(pct = estimate / total) %>% 
+  pivot_wider(names_from = variable, values_from = pct, id_cols = ald_dist)
+
+```
+
+```{r}
+tmap_mode("view")
+v <- c("2+ races", "American Indian", "Native Hawaiian/PI
+", "Some other race alone", "B02001_009", "B02001_010", "Total")
+alder %>% 
+  left_join(race, by = "ald_dist") %>% 
+  select(-objectid) %>% 
+  tm_shape() +
+  tm_polygons(c("White", "Black/African American", "Asian"),
+              style = "jenks",
+              legend.format=list(fun=function(x) paste0(formatC(x*100, digits=0, format="f"), " %"))) +
+  tm_text("ald_dist") +
+  tm_facets(free.scales = TRUE)
+
+```
+Note that each map has its own legend and the colors denote different percentages!
