@@ -79,6 +79,7 @@ race <- race %>%
 
 ```
 
+
 ```{r}
 tmap_mode("view")
 v <- c("2+ races", "American Indian", "Native Hawaiian/PI
@@ -94,4 +95,6 @@ alder %>%
   tm_facets(free.scales = TRUE)
 
 ```
-Note that each map has its own legend and the colors denote different percentages!
+
+
+Note that each map has its own legend and the colors denote different percentages! Click on the aldermanic districts to see the percentages for each group.
