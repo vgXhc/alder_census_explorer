@@ -1,5 +1,5 @@
 ---
-title: "Race/ethnicity by ward"
+title: "Race demographics by aldermanic district"
 description: |
   What are the racial demographics of Madison's aldermanic districts
 author:
